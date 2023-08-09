@@ -1,0 +1,592 @@
+1. Download vechile sales data -> https://github.com/shashank-mishra219/Hive-Class/blob/main/sales_order_data.csv
+
+2. Store raw data into hdfs location
+docker cp .\sales_order_data.csv hive-server:\home
+hadoop fs -put -f /home/sales_order_data.csv /user
+
+3. Create a internal hive table "sales_order_csv" which will store csv data sales_order_csv .. make sure to skip header row while creating table
+hive> create table sales_order_csv
+    > (
+    > ORDERNUMBER int,
+    > QUANTITYORDERED int,
+    > PRICEEACH float,
+    > ORDERLINENUMBER int,
+    > SALES float,
+    > STATUS string,
+    > QTR_ID tinyint,
+    > MONTH_ID tinyint,
+    > YEAR_ID int,
+    > PRODUCTLINE string,
+    > MSRP int,
+    > PRODUCTCODE string,
+    > PHONE string,
+    > CITY string,
+    > STATE string,
+    > POSTALCODE string,
+    > COUNTRY string,
+    > TERRITORY string,
+    > CONTACTLASTNAME string,
+    > CONTACTFIRSTNAME string,
+    > DEALSIZE string
+    > )
+    > ROW FORMAT DELIMITED
+    > FIELDS TERMINATED BY ','
+    > STORED AS TEXTFILE;
+OK
+Time taken: 1.248 seconds
+hive> ALTER TABLE sales_order_csv SET TBLPROPERTIES ("skip.header.line.count"="1");
+OK
+Time taken: 0.178 seconds
+
+
+4. Load data from hdfs path into "sales_order_csv" 
+hive> LOAD DATA INPATH '/user/sales_order_data.csv' INTO TABLE sales_order_csv;
+Loading data to table hive_db.sales_order_csv
+OK
+Time taken: 0.627 seconds
+
+5. Create an internal hive table which will store data in ORC format "sales_order_orc"
+hive> create table sales_order_csv_orc
+    > (
+    > ORDERNUMBER int,
+    > QUANTITYORDERED int,
+    > PRICEEACH float,
+    > ORDERLINENUMBER int,
+    > SALES float,
+    > STATUS string,
+    > QTR_ID tinyint,
+    > MONTH_ID tinyint,
+    > YEAR_ID int,
+    > PRODUCTLINE string,
+    > MSRP int,
+    > PRODUCTCODE string,
+    > PHONE string,
+    > CITY string,
+    > STATE string,
+    > POSTALCODE string,
+    > COUNTRY string,
+    > TERRITORY string,
+    > CONTACTLASTNAME string,
+    > CONTACTFIRSTNAME string,
+    > DEALSIZE string
+    > )
+    > ROW FORMAT DELIMITED
+    > FIELDS TERMINATED BY ','
+    > STORED AS ORC
+    > TBLPROPERTIES ("skip.header.line.count"="1");
+OK
+Time taken: 0.202 seconds
+
+6. Load data from "sales_order_csv" into "sales_order_orc"
+INSERT INTO sales_order_csv_orc SELECT * FROM sales_order_csv;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230808123628_38fd2477-2fbe-46d8-aaf5-1f118746b876
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks is set to 0 since there's no reduce operator
+Job running in-process (local Hadoop)
+2023-08-08 12:36:30,430 Stage-1 map = 100%,  reduce = 0%
+Ended Job = job_local1328238707_0001
+Stage-4 is selected by condition resolver.
+Stage-3 is filtered out by condition resolver.
+Stage-5 is filtered out by condition resolver.
+Moving data to directory hdfs://namenode:9000/user/hive/warehouse/hive_db.db/sales_order_csv_orc/.hive-staging_hive_2023-08-08_12-36-28_651_2374318044171344368-1/-ext-10000
+Loading data to table hive_db.sales_order_csv_orc
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 397117 HDFS Write: 37683 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+Time taken: 2.317 seconds
+
+Perform below menioned queries on "sales_order_orc" table :
+
+a. Calculate total sales per year
+hive> select sum(sales),year_id from sales_order_csv_orc group by year_id;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230808124537_5d69e520-0099-4003-b586-f12c67093095
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-08 12:45:39,429 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local430889602_0002
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 846874 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+3514108.547241211       2003
+4724162.593383789       2004
+1791486.7086791992      2005
+Time taken: 1.664 seconds, Fetched: 3 row(s)
+
+b. Find a product for which maximum orders were placed
+hive> select sum(quantityordered) as sqo,productcode from sales_order_csv_orc group by productcode sort by sqo desc limit 1;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230808125141_6cb7984e-9280-4f97-9f96-165d92940ca2
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-08 12:51:42,789 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local506026081_0006
+Launching Job 2 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-08 12:51:44,017 Stage-2 map = 100%,  reduce = 100%
+Ended Job = job_local128605775_0007
+Launching Job 3 out of 3
+Number of reduce tasks determined at compile time: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-08 12:51:45,257 Stage-3 map = 100%,  reduce = 100%
+Ended Job = job_local1879504406_0008
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 962344 HDFS Write: 75366 SUCCESS
+Stage-Stage-2:  HDFS Read: 962344 HDFS Write: 75366 SUCCESS
+Stage-Stage-3:  HDFS Read: 962344 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+1774    S18_3232
+Time taken: 3.796 seconds, Fetched: 1 row(s)
+
+c. Calculate the total sales for each quarter
+hive> select sum(sales),qtr_id from sales_order_csv_orc group by qtr_id;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809005153_58168394-eab2-4d8f-b2db-5bb95523d0b0
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:51:55,069 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local1612804107_0009
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 1015094 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+2347946.726501465       1
+2048120.3029174805      2
+1758910.808959961       3
+3874780.010925293       4
+Time taken: 1.317 seconds, Fetched: 4 row(s)
+
+d. In which quarter sales was minimum
+hive> select sum(sales) as ss,qtr_id from sales_order_csv_orc group by qtr_id sort by ss limit 1;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809005400_2c5027e1-dbd5-48a1-ab6a-90988dd8d454
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:54:01,381 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local995367195_0012
+Launching Job 2 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:54:02,574 Stage-2 map = 100%,  reduce = 100%
+Ended Job = job_local400661820_0013
+Launching Job 3 out of 3
+Number of reduce tasks determined at compile time: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:54:03,758 Stage-3 map = 100%,  reduce = 100%
+Ended Job = job_local605508314_0014
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 1120594 HDFS Write: 75366 SUCCESS
+Stage-Stage-2:  HDFS Read: 1120594 HDFS Write: 75366 SUCCESS
+Stage-Stage-3:  HDFS Read: 1120594 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+1758910.808959961       3
+Time taken: 3.693 seconds, Fetched: 1 row(s)
+
+e. In which country sales was maximum and in which country sales was minimum
+
+hive> select sum(sales) as ss,country from sales_order_csv_orc group by country sort by ss desc limit 1;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809005608_4f373bb4-b1e7-4db9-8245-bd390eee1c75
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:09,805 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local821536043_0015
+Launching Job 2 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:10,997 Stage-2 map = 100%,  reduce = 100%
+Ended Job = job_local2098080268_0016
+Launching Job 3 out of 3
+Number of reduce tasks determined at compile time: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:12,192 Stage-3 map = 100%,  reduce = 100%
+Ended Job = job_local136586677_0017
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 1175198 HDFS Write: 75366 SUCCESS
+Stage-Stage-2:  HDFS Read: 1175198 HDFS Write: 75366 SUCCESS
+Stage-Stage-3:  HDFS Read: 1175198 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+3625111.825744629       USA
+Time taken: 3.703 seconds, Fetched: 1 row(s)
+hive> select sum(sales) as ss,country from sales_order_csv_orc group by country sort by ss limit 1;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809005652_0ee5fca3-c844-42de-80bd-fc1cb68e5918
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:53,836 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local41888218_0018
+Launching Job 2 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:55,039 Stage-2 map = 100%,  reduce = 100%
+Ended Job = job_local2131848932_0019
+Launching Job 3 out of 3
+Number of reduce tasks determined at compile time: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 00:56:56,254 Stage-3 map = 100%,  reduce = 100%
+Ended Job = job_local1172943695_0020
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 1229802 HDFS Write: 75366 SUCCESS
+Stage-Stage-2:  HDFS Read: 1229802 HDFS Write: 75366 SUCCESS
+Stage-Stage-3:  HDFS Read: 1229802 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+57756.43029785156       Ireland
+Time taken: 3.73 seconds, Fetched: 1 row(s)
+
+f. Calculate quartelry sales for each city
+hive> select city,qtr_id,sum(sales) as ss from sales_order_csv_orc group by city,qtr_id sort by city,qtr_id;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809010012_89666f03-e34f-4dd0-af3e-d3189b4d8910
+Total jobs = 1
+Launching Job 1 out of 1
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 01:00:13,274 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local1263038122_0024
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 1396802 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+Aaarhus 4       100595.5498046875
+Allentown       2       6166.7998046875
+Allentown       3       71930.61041259766
+Allentown       4       44040.729736328125
+Barcelona       2       4219.2001953125
+Barcelona       4       74192.66003417969
+Bergamo 1       56181.320068359375
+Bergamo 4       81774.40008544922
+Bergen  3       16363.099975585938
+Bergen  4       95277.17993164062
+Boras   1       31606.72021484375
+Boras   3       53941.68981933594
+Boras   4       48710.92053222656
+Boston  2       74994.240234375
+Boston  3       15344.640014648438
+Boston  4       63730.7802734375
+Brickhaven      1       31474.7802734375
+Brickhaven      2       7277.35009765625
+Brickhaven      3       114974.53967285156
+Brickhaven      4       11528.52978515625
+Bridgewater     2       75778.99060058594
+Bridgewater     4       26115.800537109375
+Brisbane        1       16118.479858398438
+Brisbane        3       34100.030029296875
+Bruxelles       1       18800.089721679688
+Bruxelles       2       8411.949829101562
+Bruxelles       3       47760.479736328125
+Burbank 1       37850.07958984375
+Burbank 4       8234.559936523438
+Burlingame      1       13529.570190429688
+Burlingame      3       42031.83020019531
+Burlingame      4       65221.67004394531
+Cambridge       1       21782.699951171875
+Cambridge       2       14380.920043945312
+Cambridge       3       48828.71942138672
+Cambridge       4       54251.659912109375
+Charleroi       1       16628.16015625
+Charleroi       2       1711.260009765625
+Charleroi       3       1637.199951171875
+Charleroi       4       13463.480224609375
+Chatswood       2       43971.429931640625
+Chatswood       3       69694.40002441406
+Chatswood       4       37905.14990234375
+Cowes   1       26906.68017578125
+Cowes   4       51334.15966796875
+Dublin  1       38784.470458984375
+Dublin  3       18971.959838867188
+Espoo   1       51373.49072265625
+Espoo   2       31018.230102539062
+Espoo   3       31569.430053710938
+Frankfurt       1       48698.82922363281
+Frankfurt       4       36472.76025390625
+Gensve  1       50432.549560546875
+Gensve  3       67281.00903320312
+Glen Waverly    2       14378.089965820312
+Glen Waverly    3       12334.819580078125
+Glen Waverly    4       37878.54992675781
+Glendale        1       3987.199951171875
+Glendale        2       20350.949768066406
+Glendale        3       7600.1201171875
+Glendale        4       34485.49987792969
+Graz    1       8775.159912109375
+Graz    4       43488.740234375
+Helsinki        1       26422.819458007812
+Helsinki        3       42744.0595703125
+Helsinki        4       42083.499755859375
+Kobenhavn       1       58871.110107421875
+Kobenhavn       2       62091.880615234375
+Kobenhavn       4       24078.610107421875
+Koln    4       100306.58020019531
+Las Vegas       2       33847.61975097656
+Las Vegas       3       34453.84973144531
+Las Vegas       4       14449.609741210938
+Lille   1       20178.1298828125
+Lille   4       48874.28088378906
+Liverpool       2       91211.0595703125
+Liverpool       4       26797.210083007812
+London  1       8477.219970703125
+London  2       32376.29052734375
+London  4       83970.029296875
+Los Angeles     1       23889.320068359375
+Los Angeles     4       24159.14013671875
+Lule    1       9748.999755859375
+Lule    4       66005.8798828125
+Lyon    1       101339.13977050781
+Lyon    4       41535.11022949219
+Madrid  1       357668.4899291992
+Madrid  2       339588.0513305664
+Madrid  3       69714.09008789062
+Madrid  4       315580.80963134766
+Makati City     1       55245.02014160156
+Makati City     4       38770.71032714844
+Manchester      1       51017.919860839844
+Manchester      4       106789.88977050781
+Marseille       1       2317.43994140625
+Marseille       2       52481.840087890625
+Marseille       4       20136.859985351562
+Melbourne       1       49637.57067871094
+Melbourne       2       60135.84033203125
+Melbourne       4       91221.99914550781
+Minato-ku       1       38191.38977050781
+Minato-ku       2       26482.700256347656
+Minato-ku       4       55888.65026855469
+Montreal        2       58257.50012207031
+Montreal        4       15947.290405273438
+Munich  3       34993.92004394531
+NYC     1       29776.809814453125
+NYC     2       165100.33947753906
+NYC     3       63027.92004394531
+NYC     4       300011.6999511719
+Nantes  1       59617.39978027344
+Nantes  2       60344.990173339844
+Nantes  3       61310.880126953125
+Nantes  4       23031.589599609375
+Nashua  1       12133.25
+Nashua  4       119552.04949951172
+New Bedford     1       48578.95935058594
+New Bedford     3       45738.38952636719
+New Bedford     4       113557.509765625
+New Haven       2       36973.309814453125
+New Haven       4       42498.760498046875
+Newark  1       8722.1201171875
+Newark  2       74506.06909179688
+North Sydney    1       65012.41955566406
+North Sydney    3       47191.76013183594
+North Sydney    4       41791.949462890625
+Osaka   1       50490.64013671875
+Osaka   2       17114.43017578125
+Oslo    3       34145.47021484375
+Oslo    4       45078.759765625
+Oulu    1       49055.40026855469
+Oulu    2       17813.40008544922
+Oulu    3       37501.580322265625
+Paris   1       71494.17944335938
+Paris   2       80215.4203491211
+Paris   3       27798.480102539062
+Paris   4       89436.60034179688
+Pasadena        1       44273.359436035156
+Pasadena        3       55776.119873046875
+Pasadena        4       4512.47998046875
+Philadelphia    1       27398.820434570312
+Philadelphia    2       7287.240234375
+Philadelphia    4       116503.07043457031
+Reggio Emilia   2       41509.94006347656
+Reggio Emilia   3       56421.650390625
+Reggio Emilia   4       44669.740478515625
+Reims   1       52029.07043457031
+Reims   2       18971.959716796875
+Reims   3       15146.31982421875
+Reims   4       48895.59014892578
+Salzburg        2       98104.24005126953
+Salzburg        3       6693.2802734375
+Salzburg        4       45001.10986328125
+San Diego       1       87489.23010253906
+San Francisco   1       72899.19995117188
+San Francisco   4       151459.4805908203
+San Jose        2       160010.27026367188
+San Rafael      1       267315.2586669922
+San Rafael      2       7261.75
+San Rafael      3       216297.40063476562
+San Rafael      4       163983.64880371094
+Sevilla 4       54723.621154785156
+Singapore       1       28395.18994140625
+Singapore       2       92033.77014160156
+Singapore       3       90250.07995605469
+Singapore       4       77809.37023925781
+South Brisbane  1       21730.029907226562
+South Brisbane  3       10640.290161132812
+South Brisbane  4       27098.800048828125
+Stavern 1       54701.999755859375
+Stavern 4       61897.19006347656
+Strasbourg      2       80438.47985839844
+Torino  3       94117.25988769531
+Toulouse        1       15139.1201171875
+Toulouse        3       17251.08056640625
+Toulouse        4       38098.240234375
+Tsawassen       2       31302.500244140625
+Tsawassen       3       43332.349609375
+Vancouver       4       75238.91955566406
+Versailles      1       5759.419921875
+Versailles      4       59074.90026855469
+White Plains    4       85555.98962402344
+Time taken: 1.272 seconds, Fetched: 182 row(s)
+
+h. Find a month for each year in which maximum number of quantities were sold
+hive> select year_id,month_id from (select *, rank() over (partition by year_id order by sqo desc) rsqo from (select distinct year_id,month_id,sum(quantityordered) over (partition by year_id,month_id) sqo from sales_order_csv_orc) t1) t2 where rsqo = 1;
+WARNING: Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions. Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+Query ID = root_20230809030155_962227c2-9976-48cf-80dc-75f4719d4a87
+Total jobs = 3
+Launching Job 1 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 03:01:56,706 Stage-1 map = 100%,  reduce = 100%
+Ended Job = job_local2019336937_0069
+Launching Job 2 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 03:01:57,905 Stage-2 map = 100%,  reduce = 100%
+Ended Job = job_local1506526502_0070
+Launching Job 3 out of 3
+Number of reduce tasks not specified. Estimated from input data size: 1
+In order to change the average load for a reducer (in bytes):
+  set hive.exec.reducers.bytes.per.reducer=<number>
+In order to limit the maximum number of reducers:
+  set hive.exec.reducers.max=<number>
+In order to set a constant number of reducers:
+  set mapreduce.job.reduces=<number>
+Job running in-process (local Hadoop)
+2023-08-09 03:01:59,085 Stage-3 map = 100%,  reduce = 100%
+Ended Job = job_local1365175217_0071
+MapReduce Jobs Launched:
+Stage-Stage-1:  HDFS Read: 2841758 HDFS Write: 75366 SUCCESS
+Stage-Stage-2:  HDFS Read: 2841758 HDFS Write: 75366 SUCCESS
+Stage-Stage-3:  HDFS Read: 2841758 HDFS Write: 75366 SUCCESS
+Total MapReduce CPU Time Spent: 0 msec
+OK
+2003    11
+2004    11
+2005    5
+Time taken: 3.688 seconds, Fetched: 3 row(s)
